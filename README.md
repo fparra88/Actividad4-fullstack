@@ -31,4 +31,4 @@ Enviar `Authorization: Bearer <token>`. Cada usuario sólo ve y modifica sus pro
 3. Asigna un dominio a la App en EasyPanel.
 4. Para despliegue automático desde Actions: en la App → Deploy, copia la *Deploy Webhook URL* y guárdala en GitHub → Settings → Secrets como `EASYPANEL_DEPLOY_URL`.
 5. Cada push a `main` ejecuta los tests y, si pasan, dispara el despliegue ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
-..
+....
