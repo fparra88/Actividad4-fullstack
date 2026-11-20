@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Productos</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f1f5f9; margin: 0; }
+    header { background: #1e293b; color: #fff; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+    main { max-width: 900px; margin: 1.5rem auto; padding: 0 1rem; }
+    form, table { background: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+    form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; padding: 1rem; margin-bottom: 1.5rem; }
+    input { padding: .55rem; border: 1px solid #cbd5e1; border-radius: 6px; }
+    button { padding: .55rem .9rem; border: 0; border-radius: 6px; background: #2563eb; color: #fff; cursor: pointer; }
+    button.danger { background: #dc2626; } button.gray { background: #64748b; }
+    table { width: 100%; border-collapse: collapse; overflow: hidden; }
+    th, td { padding: .7rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    th { background: #e2e8f0; }
+    td.actions { white-space: nowrap; display: flex; gap: .4rem; }
+    #msg { color: #dc2626; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Gestión de productos</strong>
+    <button class="gray" id="logout">Cerrar sesión</button>
+  </header>
+  <main>
+    <div id="msg" role="alert"></div>
+    <form id="form">
+      <input id="name" placeholder="Nombre" required>
+      <input id="description" placeholder="Descripción">
+      <input id="price" type="number" step="0.01" min="0" placeholder="Precio" required>
+      <input id="stock" type="number" min="0" placeholder="Stock">
+      <input id="category" placeholder="Categoría">
+      <button type="submit" id="save">Agregar</button>
+      <button type="button" class="gray" id="cancel" hidden>Cancelar</button>
+    </form>
+    <table>
+      <thead><tr><th>Nombre</th><th>Descripción</th><th>Precio</th><th>Stock</th><th>Categoría</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </main>
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) location.href = '/login.html';
+    const $ = (id) => document.getElementById(id);
+    let editingId = null, products = [];
+
+    async function api(path = '', opts = {}) {
+      const res = await fetch('/api/products' + path, {
+        ...opts,
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      });
+      if (res.status === 401) { localStorage.removeItem('token'); location.href = '/login.html'; return; }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      return data;
+    }
+
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    async function load() {
+      try {
+        products = await api();
+        $('rows').innerHTML = products.map((p) => `
+          <tr><td>${esc(p.name)}</td><td>${esc(p.description)}</td><td>$${esc(p.price)}</td>
+          <td>${esc(p.stock)}</td><td>${esc(p.category)}</td>
+          <td class="actions"><button data-edit="${p._id}">Editar</button><button class="danger" data-del="${p._id}">Eliminar</button></td></tr>`).join('');
+      } catch (e) { $('msg').textContent = e.message; }
+    }
+
+    function reset() {
+      editingId = null; $('form').reset();
+      $('save').textContent = 'Agregar'; $('cancel').hidden = true;
+    }
+
+    $('form').onsubmit = async (e) => {
+      e.preventDefault();
+      const body = {
+        name: $('name').value, description: $('description').value,
+        price: Number($('price').value), stock: Number($('stock').value || 0),
+        category: $('category').value || 'general',
+      };
+      try {
+        await api(editingId ? '/' + editingId : '', { method: editingId ? 'PUT' : 'POST', body: JSON.stringify(body) });
+        $('msg').textContent = ''; reset(); load();
+      } catch (err) { $('msg').textContent = err.message; }
+    };
+
+    $('rows').onclick = async (e) => {
+      const { edit, del } = e.target.dataset;
+      if (edit) {
+        const p = products.find((x) => x._id === edit);
+        editingId = edit;
+        ['name', 'description', 'price', 'stock', 'category'].forEach((f) => ($(f).value = p[f]));
+        $('save').textContent = 'Guardar cambios'; $('cancel').hidden = false;
+      } else if (del && confirm('¿Eliminar este producto?')) {
+        try { await api('/' + del, { method: 'DELETE' }); load(); } catch (err) { $('msg').textContent = err.message; }
+      }
+    };
+
+    $('cancel').onclick = reset;
+    $('logout').onclick = async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      localStorage.removeItem('token'); location.href = '/login.html';
+    };
+    load();
+  </script>
+</body>
+</html>

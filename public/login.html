@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Iniciar sesión</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #1e293b url('/imagenes/portada.webp') center / cover no-repeat fixed; display: grid; place-items: center; min-height: 100vh; margin: 0; }
+    .card { background: rgba(203,213,225,.85); color: #0f172a; backdrop-filter: blur(6px); padding: 2rem; border-radius: 12px; width: min(340px, 90vw); box-shadow: 0 8px 30px rgba(0,0,0,.3); }
+    h1 { margin: 0 0 1rem; font-size: 1.4rem; }
+    label { display: block; font-size: .85rem; margin-top: .8rem; }
+    input { width: 100%; box-sizing: border-box; padding: .6rem; margin-top: .25rem; border: 1px solid #cbd5e1; border-radius: 6px; }
+    button { width: 100%; margin-top: 1.2rem; padding: .7rem; border: 0; border-radius: 6px; background: #2563eb; color: #fff; font-size: 1rem; cursor: pointer; }
+    button.link { background: none; color: #2563eb; margin-top: .6rem; padding: .3rem; }
+    #msg { margin-top: .8rem; font-size: .85rem; min-height: 1.2em; color: #dc2626; }
+    #msg.ok { color: #16a34a; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1 id="title">Iniciar sesión</h1>
+    <form id="form">
+      <label id="nameLabel" hidden>Nombre <input id="name" autocomplete="name"></label>
+      <label>Email <input id="email" type="email" required autocomplete="email"></label>
+      <label>Contraseña <input id="password" type="password" minlength="6" required autocomplete="current-password"></label>
+      <button type="submit" id="submit">Entrar</button>
+      <button type="button" class="link" id="toggle">¿No tienes cuenta? Regístrate</button>
+      <div id="msg" role="alert"></div>
+    </form>
+  </main>
+  <script>
+    let register = false;
+    const $ = (id) => document.getElementById(id);
+    const msg = (t, ok) => { $('msg').textContent = t; $('msg').className = ok ? 'ok' : ''; };
+
+    $('toggle').onclick = () => {
+      register = !register;
+      $('nameLabel').hidden = !register;
+      $('name').required = register;
+      $('title').textContent = register ? 'Crear cuenta' : 'Iniciar sesión';
+      $('submit').textContent = register ? 'Registrarme' : 'Entrar';
+      $('toggle').textContent = register ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate';
+      msg('');
+    };
+
+    async function call(path, body) {
+      const res = await fetch('/api/auth/' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      return data;
+    }
+
+    $('form').onsubmit = async (e) => {
+      e.preventDefault();
+      const email = $('email').value, password = $('password').value;
+      try {
+        if (register) {
+          await call('register', { name: $('name').value, email, password });
+          msg('Cuenta creada. Ahora inicia sesión.', true);
+          $('toggle').click();
+          return;
+        }
+        const { token } = await call('login', { email, password });
+        localStorage.setItem('token', token);
+        location.href = '/products.html';
+      } catch (err) {
+        msg(err.message);
+      }
+    };
+  </script>
+</body>
+</html>
